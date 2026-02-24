@@ -103,9 +103,6 @@
           מתחילים! 🎡
         </button>
       </div>
-      <div id="already-played" class="hidden">
-        ⛔ כבר שיחקת היום — תור אחד לכל תלמיד!
-      </div>
     </div>
 
     <!-- Step 2: Wheel -->
@@ -118,7 +115,7 @@
       <div id="prize-display">
         <div class="prize-emoji">🎁</div>
         <div class="prize-name" id="prize-name"></div>
-        <div class="prize-sub">מזל טוב! לך לתא האריזה לקבל את הפרס</div>
+        <div class="prize-sub">מזל טוב! הזכיה שלך התווספה לשקית משלוח המנות שלך</div>
       </div>
       <button class="btn btn-primary" id="spin-btn" onclick="spinWheel()">סובב! 🎡</button>
       <button class="btn btn-secondary" id="next-btn" onclick="resetToNameScreen()">תלמיד הבא →</button>
@@ -281,14 +278,6 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ student_name: currentStudent.name, student_id: currentStudent.id })
         });
-        if (r.status === 409) {
-          // Already played
-          document.getElementById('wheel-screen').style.display = 'none';
-          document.getElementById('name-screen').style.display = 'flex';
-          document.getElementById('already-played').classList.remove('hidden');
-          isSpinning = false;
-          return;
-        }
         if (!r.ok) {
           const e = await r.json();
           toast(e.error || 'שגיאה', 'error');

@@ -98,15 +98,6 @@ app.delete('/api/items/:id', (req, res) => {
 app.post('/api/spin', (req, res) => {
   const { student_name, student_id } = req.body;
 
-  // Check if student already played
-  if (student_id) {
-    const existing = db.prepare('SELECT * FROM wins WHERE student_id = ?').get(student_id);
-    if (existing) return res.status(409).json({ error: 'כבר שיחקת היום!' });
-  } else if (student_name) {
-    const existing = db.prepare('SELECT * FROM wins WHERE student_name = ?').get(student_name);
-    if (existing) return res.status(409).json({ error: 'כבר שיחקת היום!' });
-  }
-
   // Get available items
   const availableItems = db.prepare('SELECT * FROM items WHERE quantity > 0').all();
   if (availableItems.length === 0) return res.status(400).json({ error: 'אין ממתקים במלאי' });
