@@ -21,10 +21,7 @@
     .name-card { width: 100%; }
     #student-input { font-size: 1.3rem; padding: 16px 20px; border-radius: 14px; text-align: center; }
     #start-btn { width: 100%; font-size: 1.3rem; padding: 16px; }
-    #already-played {
-      background: rgba(233,69,96,0.15); border: 1px solid rgba(233,69,96,0.4);
-      border-radius: 12px; padding: 16px 20px; color: #ff8099; text-align: center;
-    }
+
 
     /* Wheel screen */
     #wheel-screen {
@@ -167,9 +164,6 @@
       const match = students.find(s => s.name === input);
       currentStudent = match || { name: input, id: null, class: '' };
 
-      // Hide "already played" message
-      document.getElementById('already-played').classList.add('hidden');
-
       // Show wheel
       document.getElementById('name-screen').style.display = 'none';
       const ws = document.getElementById('wheel-screen');
@@ -186,7 +180,6 @@
       document.getElementById('wheel-screen').style.display = 'none';
       document.getElementById('name-screen').style.display = 'flex';
       document.getElementById('student-input').value = '';
-      document.getElementById('already-played').classList.add('hidden');
       currentStudent = null;
       isSpinning = false;
       loadItems();
@@ -236,10 +229,18 @@
         ctx.fillStyle = 'white';
         ctx.shadowColor = 'rgba(0,0,0,0.5)';
         ctx.shadowBlur = 4;
-        const fontSize = items.length > 8 ? 13 : 15;
+        const fontSize = items.length > 8 ? 24 : 28;
         ctx.font = `bold ${fontSize}px Arial`;
-        const label = item.name.length > 10 ? item.name.slice(0, 9) + '…' : item.name;
-        ctx.fillText(label, r - 16, 5);
+        const words = item.name.split(' ');
+        if (words.length > 1) {
+          const mid = Math.ceil(words.length / 2);
+          const line1 = words.slice(0, mid).join(' ');
+          const line2 = words.slice(mid).join(' ');
+          ctx.fillText(line1, r - 16, -fontSize * 0.4);
+          ctx.fillText(line2, r - 16, fontSize * 0.7);
+        } else {
+          ctx.fillText(item.name, r - 16, 5);
+        }
         ctx.restore();
       });
 
