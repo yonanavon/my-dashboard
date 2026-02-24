@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ניהול - גלגל המזל</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .page-wrap { max-width: 900px; margin: 0 auto; padding: 28px 20px; }
+    .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; margin-bottom: 28px; }
+    .stat-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 20px; text-align: center; }
+    .stat-card .num { font-size: 2.2rem; font-weight: 800; color: var(--accent); }
+    .stat-card .lbl { font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; }
+    .add-form { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+    .add-form input, .add-form select { flex: 1; min-width: 120px; }
+    .add-form .btn { flex-shrink: 0; }
+    .qty-control { display: flex; align-items: center; gap: 8px; }
+    .qty-control input { width: 70px; text-align: center; padding: 6px 8px; }
+    .qty-btn { width: 28px; height: 28px; border: none; border-radius: 50%; background: var(--purple-light); color: white; cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+    .qty-btn:hover { background: var(--accent2); }
+    .search-bar { display: flex; gap: 10px; margin-bottom: 16px; }
+    .search-bar input { flex: 1; }
+    .class-badge { background: var(--purple-light); color: white; padding: 2px 10px; border-radius: 50px; font-size: 0.82rem; font-weight: 700; }
+    .danger-zone { margin-top: 32px; padding: 20px; border: 1px solid rgba(233,69,96,0.3); border-radius: var(--radius); background: rgba(233,69,96,0.05); }
+    .danger-zone h3 { color: var(--accent2); margin-bottom: 12px; }
+    .empty-msg { text-align: center; padding: 40px; color: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="navbar-brand">🎡 גלגל המזל</a>
+    <div class="navbar-links">
+      <a href="/">גלגל</a>
+      <a href="/pack">אריזה</a>
+      <a href="/admin" class="active">ניהול</a>
+    </div>
+  </nav>
+
+  <div class="page-wrap">
+    <div class="page-header">
+      <h1>ניהול מערכת</h1>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid" id="stats-grid">
+      <div class="stat-card"><div class="num" id="s-students">-</div><div class="lbl">תלמידים רשומים</div></div>
+      <div class="stat-card"><div class="num" id="s-played">-</div><div class="lbl">שיחקו</div></div>
+      <div class="stat-card"><div class="num" id="s-wins">-</div><div class="lbl">סה"כ זכיות</div></div>
+      <div class="stat-card"><div class="num" id="s-pending">-</div><div class="lbl">ממתינות לאריזה</div></div>
+      <div class="stat-card"><div class="num" id="s-packed">-</div><div class="lbl">בוצעו</div></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="card">
+      <div class="tabs mb-2" id="tabs">
+        <button class="tab-btn active" data-tab="items">🍬 ממתקים</button>
+        <button class="tab-btn" data-tab="students">👩‍🎓 תלמידים</button>
+        <button class="tab-btn" data-tab="wins">📋 זכיות</button>
+      </div>
+
+      <!-- Items Tab -->
+      <div class="tab-panel active" id="tab-items">
+        <div class="add-form">
+          <input type="text" id="item-name" placeholder="שם ממתק..." />
+          <input type="number" id="item-qty" placeholder="כמות" min="0" value="10" style="width:90px; flex:none;" />
+          <button class="btn btn-primary" onclick="addItem()">+ הוסף</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>ממתק</th><th>כמות</th><th>פעולות</th></tr></thead>
+            <tbody id="items-tbody"></tbody>
+          </table>
+        </div>
+        <div id="items-empty" class="empty-msg hidden">אין ממתקים עדיין. הוסף למעלה.</div>
+      </div>
+
+      <!-- Students Tab -->
+      <div class="tab-panel" id="tab-students">
+        <div class="add-form">
+          <input type="text" id="student-name" placeholder="שם התלמיד..." />
+          <select id="student-class">
+            <option value="">כיתה...</option>
+            <option>א'</option><option>ב'</option><option>ג'</option>
+            <option>ד'</option><option>ה'</option><option>ו'</option>
+            <option>ז'</option><option>ח'</option><option>פסיפס</option>
+          </select>
+          <button class="btn btn-primary" onclick="addStudent()">+ הוסף</button>
+        </div>
+        <div class="search-bar">
+          <input type="text" id="student-search" placeholder="חיפוש לפי שם..." oninput="renderStudents()" />
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>שם</th><th>כיתה</th><th>פעולות</th></tr></thead>
+            <tbody id="students-tbody"></tbody>
+          </table>
+        </div>
+        <div id="students-empty" class="empty-msg hidden">אין תלמידים עדיין.</div>
+      </div>
+
+      <!-- Wins Tab -->
+      <div class="tab-panel" id="tab-wins">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>תלמיד</th><th>כיתה</th><th>ממתק</th><th>זמן</th><th>סטטוס</th></tr></thead>
+            <tbody id="wins-tbody"></tbody>
+          </table>
+        </div>
+        <div id="wins-empty" class="empty-msg hidden">אין זכיות עדיין.</div>
+
+        <div class="danger-zone mt-3">
+          <h3>אזור מסוכן</h3>
+          <p class="text-muted mb-2">איפוס זכיות יחזיר את המלאי ויאפס את כל הרשומות.</p>
+          <button class="btn btn-danger" onclick="resetWins()">🗑️ אפס את כל הזכיות</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script>
+    let items = [];
+    let students = [];
+    let wins = [];
+
+    // --- Tabs ---
+    document.getElementById('tabs').addEventListener('click', e => {
+      const btn = e.target.closest('.tab-btn');
+      if (!btn) return;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+      if (btn.dataset.tab === 'wins') loadWins();
+    });
+
+    // --- Toast ---
+    function toast(msg, type = '') {
+      const c = document.getElementById('toast-container');
+      const t = document.createElement('div');
+      t.className = 'toast ' + type;
+      t.textContent = msg;
+      c.appendChild(t);
+      setTimeout(() => t.remove(), 3000);
+    }
+
+    // --- Stats ---
+    async function loadStats() {
+      const r = await fetch('/api/stats');
+      const s = await r.json();
+      document.getElementById('s-students').textContent = s.totalStudents;
+      document.getElementById('s-played').textContent = s.playedStudents;
+      document.getElementById('s-wins').textContent = s.totalWins;
+      document.getElementById('s-pending').textContent = s.pendingWins;
+      document.getElementById('s-packed').textContent = s.packedWins;
+    }
+
+    // --- Items ---
+    async function loadItems() {
+      const r = await fetch('/api/items');
+      items = await r.json();
+      renderItems();
+    }
+
+    function renderItems() {
+      const tbody = document.getElementById('items-tbody');
+      const empty = document.getElementById('items-empty');
+      if (!items.length) {
+        tbody.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+      tbody.innerHTML = items.map(item => `
+        <tr>
+          <td><strong>${esc(item.name)}</strong></td>
+          <td>
+            <div class="qty-control">
+              <button class="qty-btn" onclick="changeQty(${item.id}, ${item.quantity - 1})">−</button>
+              <input type="number" value="${item.quantity}" min="0" style="width:70px;text-align:center;padding:5px;"
+                onchange="changeQty(${item.id}, this.value)" />
+              <button class="qty-btn" onclick="changeQty(${item.id}, ${item.quantity + 1})">+</button>
+            </div>
+          </td>
+          <td>
+            <button class="btn btn-danger btn-sm" onclick="deleteItem(${item.id})">מחק</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function addItem() {
+      const name = document.getElementById('item-name').value.trim();
+      const qty = parseInt(document.getElementById('item-qty').value) || 0;
+      if (!name) return toast('הכנס שם ממתק', 'error');
+      const r = await fetch('/api/items', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, quantity: qty }) });
+      if (r.ok) {
+        document.getElementById('item-name').value = '';
+        document.getElementById('item-qty').value = '10';
+        await loadItems();
+        toast('ממתק נוסף!', 'success');
+      }
+    }
+
+    async function changeQty(id, qty) {
+      const q = Math.max(0, parseInt(qty) || 0);
+      await fetch('/api/items/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ quantity: q }) });
+      await loadItems();
+    }
+
+    async function deleteItem(id) {
+      if (!confirm('למחוק את הממתק?')) return;
+      await fetch('/api/items/' + id, { method: 'DELETE' });
+      await loadItems();
+      toast('ממתק נמחק');
+    }
+
+    // --- Students ---
+    async function loadStudents() {
+      const r = await fetch('/api/students');
+      students = await r.json();
+      renderStudents();
+    }
+
+    function renderStudents() {
+      const q = document.getElementById('student-search').value.toLowerCase();
+      const filtered = q ? students.filter(s => s.name.toLowerCase().includes(q) || s.class.includes(q)) : students;
+      const tbody = document.getElementById('students-tbody');
+      const empty = document.getElementById('students-empty');
+      if (!filtered.length) {
+        tbody.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+      tbody.innerHTML = filtered.map(s => `
+        <tr>
+          <td>${esc(s.name)}</td>
+          <td><span class="class-badge">${esc(s.class)}</span></td>
+          <td><button class="btn btn-danger btn-sm" onclick="deleteStudent(${s.id})">מחק</button></td>
+        </tr>
+      `).join('');
+    }
+
+    async function addStudent() {
+      const name = document.getElementById('student-name').value.trim();
+      const cls = document.getElementById('student-class').value;
+      if (!name || !cls) return toast('הכנס שם וכיתה', 'error');
+      const r = await fetch('/api/students', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, class: cls }) });
+      if (r.ok) {
+        document.getElementById('student-name').value = '';
+        await loadStudents();
+        toast('תלמיד נוסף!', 'success');
+      }
+    }
+
+    async function deleteStudent(id) {
+      if (!confirm('למחוק את התלמיד?')) return;
+      await fetch('/api/students/' + id, { method: 'DELETE' });
+      await loadStudents();
+      toast('תלמיד נמחק');
+    }
+
+    // --- Wins ---
+    async function loadWins() {
+      const r = await fetch('/api/wins');
+      wins = await r.json();
+      renderWins();
+      loadStats();
+    }
+
+    function renderWins() {
+      const tbody = document.getElementById('wins-tbody');
+      const empty = document.getElementById('wins-empty');
+      if (!wins.length) {
+        tbody.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+      tbody.innerHTML = wins.map(w => `
+        <tr>
+          <td>${esc(w.student_name)}</td>
+          <td><span class="class-badge">${esc(w.class || '-')}</span></td>
+          <td>${esc(w.item_name)}</td>
+          <td style="color:var(--text-muted);font-size:0.85rem">${new Date(w.timestamp).toLocaleString('he-IL')}</td>
+          <td><span class="badge ${w.packed ? 'badge-packed' : 'badge-pending'}">${w.packed ? 'בוצע ✓' : 'ממתין'}</span></td>
+        </tr>
+      `).join('');
+    }
+
+    async function resetWins() {
+      if (!confirm('לאפס את כל הזכיות ולהחזיר את המלאי?')) return;
+      const r = await fetch('/api/reset', { method: 'POST' });
+      if (r.ok) {
+        toast('זכיות אופסו!', 'success');
+        loadItems();
+        loadWins();
+        loadStats();
+      }
+    }
+
+    function esc(str) {
+      return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // Handle Enter key in add forms
+    document.getElementById('item-name').addEventListener('keydown', e => { if (e.key === 'Enter') addItem(); });
+    document.getElementById('student-name').addEventListener('keydown', e => { if (e.key === 'Enter') addStudent(); });
+
+    // Init
+    loadItems();
+    loadStudents();
+    loadStats();
+  </script>
+</body>
+</html>

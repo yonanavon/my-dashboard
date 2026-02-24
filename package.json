@@ -11,6 +11,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "express": "^5.2.1"
+    "better-sqlite3": "^12.6.2",
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3"
   }
 }

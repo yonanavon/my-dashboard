@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>גלגל המזל - פורים</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    body { background: radial-gradient(ellipse at top, #2d0a5e 0%, #1a0a2e 60%); min-height: 100vh; }
+
+    .wheel-page { display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px; }
+
+    /* Name Entry */
+    #name-screen {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; flex: 1; width: 100%; max-width: 480px;
+      gap: 24px; animation: fadeIn 0.5s ease;
+    }
+    .name-title { font-size: 3rem; font-weight: 900; text-align: center; line-height: 1.1; }
+    .name-title .sub { font-size: 1.2rem; color: var(--text-muted); font-weight: 400; margin-top: 8px; }
+    .name-card { width: 100%; }
+    #student-input { font-size: 1.3rem; padding: 16px 20px; border-radius: 14px; text-align: center; }
+    #start-btn { width: 100%; font-size: 1.3rem; padding: 16px; }
+    #already-played {
+      background: rgba(233,69,96,0.15); border: 1px solid rgba(233,69,96,0.4);
+      border-radius: 12px; padding: 16px 20px; color: #ff8099; text-align: center;
+    }
+
+    /* Wheel screen */
+    #wheel-screen {
+      display: none; flex-direction: column; align-items: center;
+      width: 100%; max-width: 560px; gap: 16px; animation: fadeIn 0.5s ease;
+    }
+    .wheel-player { font-size: 1.3rem; color: var(--accent); font-weight: 700; }
+    .wheel-wrap { position: relative; width: 100%; max-width: 480px; aspect-ratio: 1; }
+    #wheel-canvas { width: 100%; height: 100%; border-radius: 50%; box-shadow: 0 0 60px rgba(240,192,64,0.3); }
+    .wheel-pointer {
+      position: absolute; top: -18px; left: 50%; transform: translateX(-50%);
+      width: 0; height: 0;
+      border-left: 18px solid transparent;
+      border-right: 18px solid transparent;
+      border-top: 36px solid var(--accent);
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));
+      z-index: 10;
+    }
+    #spin-btn { font-size: 1.5rem; padding: 18px 48px; }
+    #next-btn { display: none; font-size: 1.1rem; }
+
+    /* Prize display */
+    #prize-display {
+      display: none; text-align: center; padding: 28px;
+      background: linear-gradient(135deg, rgba(240,192,64,0.15), rgba(240,192,64,0.05));
+      border: 2px solid var(--accent); border-radius: 20px; width: 100%;
+      animation: popIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    #prize-display .prize-emoji { font-size: 4rem; }
+    #prize-display .prize-name { font-size: 2rem; font-weight: 800; color: var(--accent); margin: 8px 0; }
+    #prize-display .prize-sub { color: var(--text-muted); }
+
+    /* Confetti */
+    .confetti-piece {
+      position: fixed; width: 10px; height: 10px; top: -10px;
+      animation: confettiFall linear forwards;
+      z-index: 9999; border-radius: 2px; pointer-events: none;
+    }
+    @keyframes confettiFall {
+      to { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+    }
+    @keyframes popIn {
+      from { transform: scale(0.5); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="navbar-brand">🎡 גלגל המזל</a>
+    <div class="navbar-links">
+      <a href="/" class="active">גלגל</a>
+      <a href="/pack">אריזה</a>
+      <a href="/admin">ניהול</a>
+    </div>
+  </nav>
+
+  <div class="wheel-page">
+    <!-- Step 1: Name entry -->
+    <div id="name-screen">
+      <div class="name-title">
+        🎉 גלגל המזל<br>
+        <span class="sub">שוק פורים ה-תשפ"ה</span>
+      </div>
+      <div class="card name-card">
+        <div class="form-group">
+          <label for="student-input">מה שמך?</label>
+          <input type="text" id="student-input" list="students-list" placeholder="הכנס את שמך..." autocomplete="off" />
+          <datalist id="students-list"></datalist>
+        </div>
+        <button class="btn btn-primary mt-2" id="start-btn" onclick="startWheel()" style="width:100%;font-size:1.1rem;padding:14px;">
+          מתחילים! 🎡
+        </button>
+      </div>
+      <div id="already-played" class="hidden">
+        ⛔ כבר שיחקת היום — תור אחד לכל תלמיד!
+      </div>
+    </div>
+
+    <!-- Step 2: Wheel -->
+    <div id="wheel-screen">
+      <div class="wheel-player" id="player-name"></div>
+      <div class="wheel-wrap">
+        <div class="wheel-pointer"></div>
+        <canvas id="wheel-canvas" width="480" height="480"></canvas>
+      </div>
+      <div id="prize-display">
+        <div class="prize-emoji">🎁</div>
+        <div class="prize-name" id="prize-name"></div>
+        <div class="prize-sub">מזל טוב! לך לתא האריזה לקבל את הפרס</div>
+      </div>
+      <button class="btn btn-primary" id="spin-btn" onclick="spinWheel()">סובב! 🎡</button>
+      <button class="btn btn-secondary" id="next-btn" onclick="resetToNameScreen()">תלמיד הבא →</button>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script>
+    // ===== State =====
+    let students = [];
+    let items = [];
+    let currentStudent = null;
+    let isSpinning = false;
+    let currentAngle = 0;
+
+    const COLORS = [
+      '#e74c3c','#e67e22','#f1c40f','#2ecc71','#1abc9c',
+      '#3498db','#9b59b6','#e91e63','#ff5722','#4caf50',
+      '#00bcd4','#ff9800','#8bc34a','#673ab7','#f44336','#2196f3'
+    ];
+
+    // ===== Init =====
+    async function init() {
+      await Promise.all([loadStudents(), loadItems()]);
+    }
+
+    async function loadStudents() {
+      const r = await fetch('/api/students');
+      students = await r.json();
+      const dl = document.getElementById('students-list');
+      dl.innerHTML = students.map(s =>
+        `<option value="${esc(s.name)}" data-id="${s.id}" data-class="${esc(s.class)}">${esc(s.name)} (${esc(s.class)})</option>`
+      ).join('');
+    }
+
+    async function loadItems() {
+      const r = await fetch('/api/items');
+      items = (await r.json()).filter(i => i.quantity > 0);
+      drawWheel(0);
+    }
+
+    // ===== Name Screen =====
+    async function startWheel() {
+      const input = document.getElementById('student-input').value.trim();
+      if (!input) return toast('הכנס שם!', 'error');
+
+      // Find student
+      const match = students.find(s => s.name === input);
+      currentStudent = match || { name: input, id: null, class: '' };
+
+      // Hide "already played" message
+      document.getElementById('already-played').classList.add('hidden');
+
+      // Show wheel
+      document.getElementById('name-screen').style.display = 'none';
+      const ws = document.getElementById('wheel-screen');
+      ws.style.display = 'flex';
+      document.getElementById('player-name').textContent = '👤 ' + currentStudent.name;
+      document.getElementById('spin-btn').disabled = false;
+      document.getElementById('prize-display').style.display = 'none';
+      document.getElementById('next-btn').style.display = 'none';
+
+      await loadItems();
+    }
+
+    function resetToNameScreen() {
+      document.getElementById('wheel-screen').style.display = 'none';
+      document.getElementById('name-screen').style.display = 'flex';
+      document.getElementById('student-input').value = '';
+      document.getElementById('already-played').classList.add('hidden');
+      currentStudent = null;
+      isSpinning = false;
+      loadItems();
+    }
+
+    // ===== Wheel Drawing =====
+    function drawWheel(rotation) {
+      const canvas = document.getElementById('wheel-canvas');
+      const ctx = canvas.getContext('2d');
+      const cx = canvas.width / 2, cy = canvas.height / 2;
+      const r = cx - 4;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (!items.length) {
+        ctx.fillStyle = '#333';
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 22px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('אין ממתקים', cx, cy);
+        return;
+      }
+
+      const slice = (Math.PI * 2) / items.length;
+
+      items.forEach((item, i) => {
+        const startAngle = rotation + i * slice;
+        const endAngle = startAngle + slice;
+
+        // Slice
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, r, startAngle, endAngle);
+        ctx.closePath();
+        ctx.fillStyle = COLORS[i % COLORS.length];
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Text
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(startAngle + slice / 2);
+        ctx.textAlign = 'right';
+        ctx.fillStyle = 'white';
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.shadowBlur = 4;
+        const fontSize = items.length > 8 ? 13 : 15;
+        ctx.font = `bold ${fontSize}px Arial`;
+        const label = item.name.length > 10 ? item.name.slice(0, 9) + '…' : item.name;
+        ctx.fillText(label, r - 16, 5);
+        ctx.restore();
+      });
+
+      // Center circle
+      ctx.beginPath();
+      ctx.arc(cx, cy, 28, 0, Math.PI * 2);
+      ctx.fillStyle = '#1a0a2e';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 18px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('🎡', cx, cy + 6);
+    }
+
+    // ===== Spin Logic =====
+    async function spinWheel() {
+      if (isSpinning || !items.length) return;
+      if (!currentStudent) return;
+
+      isSpinning = true;
+      document.getElementById('spin-btn').disabled = true;
+      document.getElementById('prize-display').style.display = 'none';
+
+      // Play spin sound
+      playSpinSound();
+
+      // Ask server for winner
+      let winData;
+      try {
+        const r = await fetch('/api/spin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ student_name: currentStudent.name, student_id: currentStudent.id })
+        });
+        if (r.status === 409) {
+          // Already played
+          document.getElementById('wheel-screen').style.display = 'none';
+          document.getElementById('name-screen').style.display = 'flex';
+          document.getElementById('already-played').classList.remove('hidden');
+          isSpinning = false;
+          return;
+        }
+        if (!r.ok) {
+          const e = await r.json();
+          toast(e.error || 'שגיאה', 'error');
+          isSpinning = false;
+          document.getElementById('spin-btn').disabled = false;
+          return;
+        }
+        winData = await r.json();
+      } catch (e) {
+        toast('שגיאת רשת', 'error');
+        isSpinning = false;
+        document.getElementById('spin-btn').disabled = false;
+        return;
+      }
+
+      // Find winner index
+      const winnerItem = winData.item;
+      const winnerIdx = items.findIndex(i => i.id === winnerItem.id);
+
+      // Calculate target angle
+      // Pointer is at top (−π/2). We want the winning slice to land under the pointer.
+      const slice = (Math.PI * 2) / items.length;
+      const targetSliceCenter = winnerIdx * slice + slice / 2;
+      // We want: currentAngle + extra rotations + targetSliceCenter = −π/2 (mod 2π)
+      // Pointer is at top = -Math.PI/2. Wheel rotates, so slice center should align to -Math.PI/2.
+      const spins = 5 + Math.floor(Math.random() * 3); // 5-7 full rotations
+      const targetAngle = -Math.PI / 2 - targetSliceCenter + spins * Math.PI * 2;
+      const finalAngle = currentAngle + (targetAngle - ((currentAngle) % (Math.PI * 2)));
+
+      // Make sure we spin enough
+      const totalSpin = finalAngle - currentAngle;
+      const actualTotal = totalSpin < 4 * Math.PI ? totalSpin + spins * Math.PI * 2 : totalSpin;
+
+      animateSpin(currentAngle, currentAngle + actualTotal, 5000, () => {
+        currentAngle = (currentAngle + actualTotal) % (Math.PI * 2);
+        isSpinning = false;
+        showPrize(winData.win.item_name);
+      });
+    }
+
+    function animateSpin(from, to, duration, onDone) {
+      const start = performance.now();
+      function frame(now) {
+        const elapsed = now - start;
+        const t = Math.min(elapsed / duration, 1);
+        // Ease out cubic
+        const eased = 1 - Math.pow(1 - t, 3);
+        const angle = from + (to - from) * eased;
+        drawWheel(angle);
+        if (t < 1) {
+          requestAnimationFrame(frame);
+        } else {
+          onDone();
+        }
+      }
+      requestAnimationFrame(frame);
+    }
+
+    function showPrize(name) {
+      document.getElementById('prize-name').textContent = name;
+      const pd = document.getElementById('prize-display');
+      pd.style.display = 'block';
+      document.getElementById('next-btn').style.display = 'inline-flex';
+      launchConfetti();
+      playFanfare();
+    }
+
+    // ===== Sound =====
+    let audioCtx = null;
+
+    function getAudioCtx() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      return audioCtx;
+    }
+
+    function playSpinSound() {
+      try {
+        const ctx = getAudioCtx();
+        const duration = 5.0;
+        const startFreq = 80, endFreq = 40;
+        for (let i = 0; i < 40; i++) {
+          const t = i / 39;
+          const delay = t * duration * 0.9;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.frequency.value = startFreq + (endFreq - startFreq) * t;
+          gain.gain.setValueAtTime(0.15, ctx.currentTime + delay);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.08);
+          osc.start(ctx.currentTime + delay);
+          osc.stop(ctx.currentTime + delay + 0.1);
+        }
+      } catch(e) {}
+    }
+
+    function playFanfare() {
+      try {
+        const ctx = getAudioCtx();
+        const notes = [523, 659, 784, 1047]; // C5 E5 G5 C6
+        notes.forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.type = 'triangle';
+          osc.frequency.value = freq;
+          const start = ctx.currentTime + i * 0.15;
+          gain.gain.setValueAtTime(0.25, start);
+          gain.gain.exponentialRampToValueAtTime(0.001, start + 0.4);
+          osc.start(start);
+          osc.stop(start + 0.5);
+        });
+      } catch(e) {}
+    }
+
+    // ===== Confetti =====
+    function launchConfetti() {
+      const colors = ['#f0c040','#e94560','#2ecc71','#3498db','#9b59b6','#ff9800','#e91e63'];
+      for (let i = 0; i < 80; i++) {
+        setTimeout(() => {
+          const el = document.createElement('div');
+          el.className = 'confetti-piece';
+          el.style.left = Math.random() * 100 + 'vw';
+          el.style.background = colors[Math.floor(Math.random() * colors.length)];
+          el.style.width = (8 + Math.random() * 8) + 'px';
+          el.style.height = (8 + Math.random() * 8) + 'px';
+          el.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+          el.style.animationDuration = (2 + Math.random() * 2) + 's';
+          document.body.appendChild(el);
+          setTimeout(() => el.remove(), 5000);
+        }, i * 30);
+      }
+    }
+
+    // ===== Toast =====
+    function toast(msg, type = '') {
+      const c = document.getElementById('toast-container');
+      const t = document.createElement('div');
+      t.className = 'toast ' + type;
+      t.textContent = msg;
+      c.appendChild(t);
+      setTimeout(() => t.remove(), 3000);
+    }
+
+    function esc(str) {
+      return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // Enter key on name input
+    document.getElementById('student-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') startWheel();
+    });
+
+    init();
+  </script>
+</body>
+</html>

@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>דשבורד אריזה - גלגל המזל</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    body { background: #0d1117; }
+
+    .pack-layout {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 20px;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px 20px;
+      min-height: calc(100vh - 64px);
+    }
+
+    @media (max-width: 700px) {
+      .pack-layout { grid-template-columns: 1fr; }
+    }
+
+    /* Current item */
+    .current-card {
+      background: linear-gradient(135deg, rgba(46,204,113,0.12), rgba(46,204,113,0.04));
+      border: 2px solid var(--green);
+      border-radius: 24px;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      min-height: 300px;
+      position: relative;
+    }
+    .current-card.empty {
+      border-color: var(--card-border);
+      background: var(--card-bg);
+    }
+    .current-label {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 16px;
+    }
+    .current-item-name {
+      font-size: 3rem;
+      font-weight: 900;
+      color: var(--green);
+      margin-bottom: 12px;
+      line-height: 1.1;
+    }
+    .current-student {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+    .current-class {
+      font-size: 1rem;
+      color: var(--text-muted);
+      margin-bottom: 28px;
+    }
+    .pack-hint {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--card-border);
+      border-radius: 50px;
+      padding: 10px 24px;
+      font-size: 1rem;
+      color: var(--text-muted);
+    }
+    .pack-hint kbd {
+      background: rgba(255,255,255,0.15);
+      border-radius: 6px;
+      padding: 2px 10px;
+      font-family: monospace;
+      font-size: 1.1rem;
+      color: var(--accent);
+      font-weight: 700;
+    }
+    .pack-btn {
+      font-size: 1.2rem;
+      padding: 14px 40px;
+      margin-top: 16px;
+    }
+
+    /* Sidebar */
+    .sidebar { display: flex; flex-direction: column; gap: 16px; }
+
+    .queue-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); overflow: hidden; }
+    .queue-card-header {
+      padding: 14px 20px;
+      background: rgba(255,255,255,0.05);
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .queue-count { background: var(--accent); color: #1a0a2e; border-radius: 50px; padding: 2px 10px; font-size: 0.8rem; font-weight: 800; }
+
+    .queue-list { max-height: 260px; overflow-y: auto; }
+    .queue-item {
+      padding: 12px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-size: 0.9rem;
+    }
+    .queue-item:last-child { border-bottom: none; }
+    .queue-item .item-n { font-weight: 700; color: var(--text); }
+    .queue-item .item-s { color: var(--text-muted); font-size: 0.82rem; margin-top: 2px; }
+
+    .done-list { max-height: 240px; overflow-y: auto; }
+    .done-item {
+      padding: 10px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .done-item:last-child { border-bottom: none; }
+    .done-item .check { color: var(--green); font-size: 1rem; }
+
+    .empty-queue { padding: 24px; text-align: center; color: var(--text-muted); font-size: 0.9rem; }
+
+    /* Flash animation when new item arrives */
+    @keyframes flashGreen {
+      0% { box-shadow: 0 0 0 0 rgba(46,204,113,0.6); }
+      50% { box-shadow: 0 0 0 20px rgba(46,204,113,0); }
+      100% { box-shadow: 0 0 0 0 rgba(46,204,113,0); }
+    }
+    .flash { animation: flashGreen 0.8s ease; }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="navbar-brand">🎡 גלגל המזל</a>
+    <div class="navbar-links">
+      <a href="/">גלגל</a>
+      <a href="/pack" class="active">אריזה</a>
+      <a href="/admin">ניהול</a>
+    </div>
+  </nav>
+
+  <div class="pack-layout">
+    <!-- Main: Current Item -->
+    <div>
+      <div class="current-card empty" id="current-card">
+        <div class="current-label">לאריזה עכשיו</div>
+        <div id="current-empty" style="color:var(--text-muted);font-size:1.1rem;">
+          <div style="font-size:3rem;margin-bottom:12px;">📦</div>
+          ממתינים לזכיות...
+        </div>
+        <div id="current-content" style="display:none;width:100%;">
+          <div class="current-item-name" id="cur-item-name"></div>
+          <div class="current-student" id="cur-student"></div>
+          <div class="current-class" id="cur-class"></div>
+          <div class="pack-hint">לחץ <kbd>SPACE</kbd> לסיום</div>
+          <button class="btn btn-success pack-btn" onclick="packCurrent()">✓ בוצע</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <!-- Queue -->
+      <div class="queue-card">
+        <div class="queue-card-header">
+          בתור
+          <span class="queue-count" id="queue-count">0</span>
+        </div>
+        <div class="queue-list" id="queue-list">
+          <div class="empty-queue">התור ריק</div>
+        </div>
+      </div>
+
+      <!-- Done -->
+      <div class="queue-card">
+        <div class="queue-card-header">
+          בוצע
+          <span class="queue-count" id="done-count" style="background:var(--green)">0</span>
+        </div>
+        <div class="done-list" id="done-list">
+          <div class="empty-queue">אין עדיין</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    // ===== State =====
+    let queue = [];     // [{id, student_name, item_name, class}]
+    let done = [];
+    let current = null;
+
+    // ===== Socket =====
+    const socket = io();
+
+    socket.on('new_win', ({ win }) => {
+      queue.push(win);
+      renderAll();
+      if (!current) advanceQueue();
+    });
+
+    socket.on('item_packed', ({ win_id }) => {
+      // If this is our current item being packed from another tab
+      if (current && current.id === win_id) {
+        done.unshift(current);
+        current = null;
+        advanceQueue();
+      } else {
+        // Remove from queue if it was there
+        const idx = queue.findIndex(w => w.id === win_id);
+        if (idx !== -1) {
+          const removed = queue.splice(idx, 1)[0];
+          done.unshift(removed);
+        }
+      }
+      renderAll();
+    });
+
+    // ===== Load existing wins =====
+    async function loadWins() {
+      const r = await fetch('/api/wins');
+      const wins = await r.json();
+      // Split into pending and done
+      const pending = wins.filter(w => !w.packed).reverse(); // oldest first
+      done = wins.filter(w => w.packed).reverse();
+      queue = pending;
+      if (queue.length) advanceQueue();
+      else renderAll();
+    }
+
+    // ===== Queue management =====
+    function advanceQueue() {
+      if (current) return; // already have one
+      if (queue.length === 0) {
+        current = null;
+        renderAll();
+        return;
+      }
+      current = queue.shift();
+      renderAll();
+    }
+
+    async function packCurrent() {
+      if (!current) return;
+      const id = current.id;
+      const r = await fetch('/api/wins/' + id + '/pack', { method: 'PUT' });
+      if (r.status === 409) {
+        // Already packed (another tab got it)
+        toast('כבר בוצע על ידי אחד אחר', 'error');
+        done.unshift(current);
+        current = null;
+        advanceQueue();
+        return;
+      }
+      if (!r.ok) return;
+      // Socket event will handle the UI update
+    }
+
+    // ===== Render =====
+    function renderAll() {
+      renderCurrent();
+      renderQueue();
+      renderDone();
+    }
+
+    function renderCurrent() {
+      const card = document.getElementById('current-card');
+      const empty = document.getElementById('current-empty');
+      const content = document.getElementById('current-content');
+
+      if (!current) {
+        card.classList.add('empty');
+        empty.style.display = 'block';
+        content.style.display = 'none';
+        return;
+      }
+
+      card.classList.remove('empty');
+      empty.style.display = 'none';
+      content.style.display = 'block';
+      document.getElementById('cur-item-name').textContent = current.item_name;
+      document.getElementById('cur-student').textContent = '👤 ' + current.student_name;
+      document.getElementById('cur-class').textContent = current.class ? 'כיתה ' + current.class : '';
+
+      // Flash animation
+      card.classList.remove('flash');
+      void card.offsetWidth;
+      card.classList.add('flash');
+    }
+
+    function renderQueue() {
+      const list = document.getElementById('queue-list');
+      document.getElementById('queue-count').textContent = queue.length;
+
+      if (!queue.length) {
+        list.innerHTML = '<div class="empty-queue">התור ריק</div>';
+        return;
+      }
+      list.innerHTML = queue.map((w, i) => `
+        <div class="queue-item">
+          <div class="item-n">${esc(w.item_name)}</div>
+          <div class="item-s">${esc(w.student_name)}${w.class ? ' · כיתה ' + esc(w.class) : ''}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderDone() {
+      const list = document.getElementById('done-list');
+      document.getElementById('done-count').textContent = done.length;
+
+      if (!done.length) {
+        list.innerHTML = '<div class="empty-queue">אין עדיין</div>';
+        return;
+      }
+      list.innerHTML = done.slice(0, 20).map(w => `
+        <div class="done-item">
+          <span class="check">✓</span>
+          <span>${esc(w.item_name)} — ${esc(w.student_name)}</span>
+        </div>
+      `).join('');
+    }
+
+    // ===== Keyboard =====
+    document.addEventListener('keydown', e => {
+      if (e.code === 'Space' || e.key === ' ') {
+        e.preventDefault();
+        packCurrent();
+      }
+    });
+
+    function esc(str) {
+      return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function toast(msg, type = '') {
+      const c = document.getElementById('toast-container');
+      const t = document.createElement('div');
+      t.className = 'toast ' + type;
+      t.textContent = msg;
+      c.appendChild(t);
+      setTimeout(() => t.remove(), 3000);
+    }
+
+    loadWins();
+  </script>
+</body>
+</html>
