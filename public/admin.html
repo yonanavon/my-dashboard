@@ -25,6 +25,31 @@
     .danger-zone { margin-top: 32px; padding: 20px; border: 1px solid rgba(233,69,96,0.3); border-radius: var(--radius); background: rgba(233,69,96,0.05); }
     .danger-zone h3 { color: var(--accent2); margin-bottom: 12px; }
     .empty-msg { text-align: center; padding: 40px; color: var(--text-muted); }
+
+    /* Import Modal */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 200; display: flex; align-items: center; justify-content: center; }
+    .modal-box { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 28px; max-width: 560px; width: 92%; max-height: 88vh; overflow-y: auto; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .modal-header h2 { margin: 0; font-size: 1.25rem; }
+    .modal-close { background: none; border: none; color: var(--text-muted); font-size: 1.4rem; cursor: pointer; line-height: 1; padding: 2px 6px; border-radius: 4px; }
+    .modal-close:hover { color: white; background: rgba(255,255,255,0.1); }
+    .modal-tabs { display: flex; gap: 8px; margin-bottom: 18px; }
+    .modal-tab { padding: 7px 18px; border: 1px solid var(--card-border); border-radius: 20px; background: transparent; color: var(--text-muted); cursor: pointer; font-size: 0.9rem; transition: all 0.2s; }
+    .modal-tab.active { background: var(--purple-light); color: white; border-color: transparent; }
+    .import-hint { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px; line-height: 1.5; }
+    .import-hint code { background: rgba(255,255,255,0.1); padding: 1px 6px; border-radius: 4px; font-size: 0.82rem; }
+    #import-paste { width: 100%; height: 160px; resize: vertical; font-family: monospace; font-size: 0.9rem; box-sizing: border-box; }
+    .file-upload-label { display: inline-flex; align-items: center; gap: 10px; padding: 12px 20px; border: 2px dashed var(--card-border); border-radius: var(--radius); cursor: pointer; transition: border-color 0.2s; color: var(--text-muted); font-size: 0.9rem; }
+    .file-upload-label:hover { border-color: var(--accent); color: white; }
+    .file-upload-label input[type="file"] { display: none; }
+    .import-default-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+    .import-default-row label { font-size: 0.88rem; color: var(--text-muted); }
+    .import-default-row select { flex: none; min-width: 110px; }
+    .import-preview-header { display: flex; justify-content: space-between; align-items: center; margin: 16px 0 8px; }
+    .import-preview-header strong { font-size: 0.95rem; }
+    .import-table-wrap { max-height: 200px; overflow-y: auto; border: 1px solid var(--card-border); border-radius: 6px; }
+    .import-table-wrap table { margin: 0; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; border-top: 1px solid var(--card-border); padding-top: 16px; }
   </style>
 </head>
 <body>
@@ -86,6 +111,7 @@
             <option>ז'</option><option>ח'</option><option>פסיפס</option>
           </select>
           <button class="btn btn-primary" onclick="addStudent()">+ הוסף</button>
+          <button class="btn btn-ghost" onclick="openImportModal()">📥 ייבוא רשימה</button>
         </div>
         <div class="search-bar">
           <input type="text" id="student-search" placeholder="חיפוש לפי שם..." oninput="renderStudents()" />
@@ -114,6 +140,72 @@
           <p class="text-muted mb-2">איפוס זכיות יחזיר את המלאי ויאפס את כל הרשומות.</p>
           <button class="btn btn-danger" onclick="resetWins()">🗑️ אפס את כל הזכיות</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import Modal -->
+  <div id="import-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>📥 ייבוא תלמידים</h2>
+        <button class="modal-close" onclick="closeImportModal()">✕</button>
+      </div>
+
+      <div class="modal-tabs">
+        <button class="modal-tab active" id="tab-paste-btn" onclick="switchImportTab('paste')">הדבק טקסט</button>
+        <button class="modal-tab" id="tab-file-btn" onclick="switchImportTab('file')">קובץ CSV</button>
+      </div>
+
+      <!-- Paste Tab -->
+      <div id="import-paste-section">
+        <p class="import-hint">
+          הדבק רשימת תלמידים — כל שורה תלמיד אחד.<br>
+          פורמטים נתמכים: <code>שם,כיתה</code> &nbsp;|&nbsp; <code>שם[Tab]כיתה</code> &nbsp;|&nbsp; <code>שם בלבד</code>
+        </p>
+        <textarea id="import-paste" placeholder="ישראל ישראלי,א'&#10;שרה כהן,ב'&#10;דוד לוי&#10;..." oninput="parseImport()"></textarea>
+      </div>
+
+      <!-- File Tab -->
+      <div id="import-file-section" class="hidden">
+        <p class="import-hint">
+          העלה קובץ CSV או TXT. פורמט: <code>שם,כיתה</code> (שורה ראשונה יכולה להיות כותרת).
+        </p>
+        <label class="file-upload-label">
+          <input type="file" id="import-file" accept=".csv,.txt" onchange="loadCSVFile()" />
+          📁 בחר קובץ...
+        </label>
+        <span id="import-file-name" class="text-muted" style="margin-right:10px;font-size:0.88rem;"></span>
+      </div>
+
+      <!-- Default class for rows without class -->
+      <div class="import-default-row">
+        <label>כיתה ברירת מחדל (לשורות ללא כיתה):</label>
+        <select id="import-default-class" onchange="parseImport()">
+          <option value="">— בחר —</option>
+          <option>א'</option><option>ב'</option><option>ג'</option>
+          <option>ד'</option><option>ה'</option><option>ו'</option>
+          <option>ז'</option><option>ח'</option><option>פסיפס</option>
+        </select>
+      </div>
+
+      <!-- Preview -->
+      <div id="import-preview" class="hidden">
+        <div class="import-preview-header">
+          <strong id="import-count"></strong>
+          <span id="import-warnings" style="font-size:0.82rem;color:var(--text-muted);"></span>
+        </div>
+        <div class="import-table-wrap">
+          <table>
+            <thead><tr><th>שם</th><th>כיתה</th></tr></thead>
+            <tbody id="import-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeImportModal()">ביטול</button>
+        <button class="btn btn-primary" id="import-btn" onclick="doImport()" disabled>ייבא תלמידים</button>
       </div>
     </div>
   </div>
@@ -309,6 +401,153 @@
     // Handle Enter key in add forms
     document.getElementById('item-name').addEventListener('keydown', e => { if (e.key === 'Enter') addItem(); });
     document.getElementById('student-name').addEventListener('keydown', e => { if (e.key === 'Enter') addStudent(); });
+
+    // --- Import Modal ---
+    let importParsed = [];
+
+    function openImportModal() {
+      document.getElementById('import-paste').value = '';
+      document.getElementById('import-file-name').textContent = '';
+      document.getElementById('import-default-class').value = '';
+      document.getElementById('import-preview').classList.add('hidden');
+      document.getElementById('import-btn').disabled = true;
+      document.getElementById('import-btn').textContent = 'ייבא תלמידים';
+      importParsed = [];
+      switchImportTab('paste');
+      document.getElementById('import-modal').classList.remove('hidden');
+    }
+
+    function closeImportModal() {
+      document.getElementById('import-modal').classList.add('hidden');
+    }
+
+    function switchImportTab(tab) {
+      const isPaste = tab === 'paste';
+      document.getElementById('import-paste-section').classList.toggle('hidden', !isPaste);
+      document.getElementById('import-file-section').classList.toggle('hidden', isPaste);
+      document.getElementById('tab-paste-btn').classList.toggle('active', isPaste);
+      document.getElementById('tab-file-btn').classList.toggle('active', !isPaste);
+      parseImport();
+    }
+
+    function loadCSVFile() {
+      const file = document.getElementById('import-file').files[0];
+      if (!file) return;
+      document.getElementById('import-file-name').textContent = file.name;
+      const reader = new FileReader();
+      reader.onload = e => {
+        // Strip BOM if present
+        let text = e.target.result.replace(/^\uFEFF/, '');
+        document.getElementById('import-paste').value = text;
+        parseImport();
+      };
+      reader.readAsText(file, 'UTF-8');
+    }
+
+    function parseImport() {
+      const raw = document.getElementById('import-paste').value;
+      const defaultClass = document.getElementById('import-default-class').value;
+
+      const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+      const valid = [];
+      let skippedNoClass = 0;
+
+      for (const line of lines) {
+        // Skip header rows
+        if (/^(שם|name|student|תלמיד)/i.test(line)) continue;
+
+        let name = '', cls = '';
+
+        if (line.includes('\t')) {
+          const parts = line.split('\t').map(p => p.trim());
+          name = parts[0]; cls = parts[1] || '';
+        } else if (line.includes(',')) {
+          const parts = line.split(',').map(p => p.trim());
+          name = parts[0]; cls = parts[1] || '';
+        } else {
+          name = line.trim();
+        }
+
+        if (!name) continue;
+
+        if (!cls) cls = defaultClass;
+
+        if (cls) {
+          valid.push({ name, class: cls });
+        } else {
+          skippedNoClass++;
+        }
+      }
+
+      importParsed = valid;
+
+      const preview = document.getElementById('import-preview');
+      const importBtn = document.getElementById('import-btn');
+
+      if (!valid.length && !skippedNoClass) {
+        preview.classList.add('hidden');
+        importBtn.disabled = true;
+        return;
+      }
+
+      preview.classList.remove('hidden');
+      document.getElementById('import-count').textContent = `${valid.length} תלמידים יתווספו`;
+      const warn = skippedNoClass > 0
+        ? `${skippedNoClass} שורות ללא כיתה הושמטו — בחר כיתה ברירת מחדל כדי לכלול אותן`
+        : '';
+      document.getElementById('import-warnings').textContent = warn;
+
+      const tbody = document.getElementById('import-tbody');
+      const preview50 = valid.slice(0, 50);
+      tbody.innerHTML = preview50.map(s => `
+        <tr>
+          <td>${esc(s.name)}</td>
+          <td><span class="class-badge">${esc(s.class)}</span></td>
+        </tr>
+      `).join('') + (valid.length > 50
+        ? `<tr><td colspan="2" style="text-align:center;color:var(--text-muted);padding:10px">... ועוד ${valid.length - 50} תלמידים</td></tr>`
+        : '');
+
+      importBtn.disabled = valid.length === 0;
+      importBtn.textContent = valid.length > 0 ? `ייבא ${valid.length} תלמידים` : 'ייבא תלמידים';
+    }
+
+    async function doImport() {
+      if (!importParsed.length) return;
+      const btn = document.getElementById('import-btn');
+      btn.disabled = true;
+      btn.textContent = 'מייבא...';
+
+      try {
+        const r = await fetch('/api/students/bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ students: importParsed })
+        });
+        if (r.ok) {
+          const data = await r.json();
+          closeImportModal();
+          await loadStudents();
+          loadStats();
+          const dupes = data.total - data.added;
+          toast(`יובאו ${data.added} תלמידים${dupes > 0 ? ` (${dupes} כפילויות הושמטו)` : ''}!`, 'success');
+        } else {
+          toast('שגיאה בייבוא', 'error');
+          btn.disabled = false;
+          btn.textContent = `ייבא ${importParsed.length} תלמידים`;
+        }
+      } catch {
+        toast('שגיאת רשת', 'error');
+        btn.disabled = false;
+        btn.textContent = `ייבא ${importParsed.length} תלמידים`;
+      }
+    }
+
+    // Close modal on backdrop click
+    document.getElementById('import-modal').addEventListener('click', e => {
+      if (e.target === document.getElementById('import-modal')) closeImportModal();
+    });
 
     // Init
     loadItems();

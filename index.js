@@ -65,6 +65,31 @@ app.delete('/api/students/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+app.post('/api/students/bulk', (req, res) => {
+  const { students } = req.body;
+  if (!Array.isArray(students) || students.length === 0)
+    return res.status(400).json({ error: 'נדרשת רשימת תלמידים' });
+
+  const insertMany = db.transaction((list) => {
+    let added = 0;
+    for (const s of list) {
+      if (!s.name || !s.class) continue;
+      const name = s.name.trim();
+      const cls = s.class.trim();
+      if (!name || !cls) continue;
+      const exists = db.prepare('SELECT id FROM students WHERE name = ? AND class = ?').get(name, cls);
+      if (!exists) {
+        db.prepare('INSERT INTO students (name, class) VALUES (?, ?)').run(name, cls);
+        added++;
+      }
+    }
+    return added;
+  });
+
+  const added = insertMany(students);
+  res.json({ ok: true, added, total: students.length });
+});
+
 // --- Items API ---
 app.get('/api/items', (req, res) => {
   const items = db.prepare('SELECT * FROM items ORDER BY name').all();
