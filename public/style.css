@@ -90,6 +90,7 @@ input:focus, select:focus, textarea:focus {
   border-color: var(--accent);
 }
 input::placeholder { color: var(--text-muted); }
+option { background: #fff; color: #1a1a2e; }
 
 /* ======= Tables ======= */
 .table-wrap { overflow-x: auto; border-radius: var(--radius); }
