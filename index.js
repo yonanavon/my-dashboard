@@ -205,6 +205,7 @@ app.post('/api/spin', async (req, res) => {
 
     const win = {
       id: winResult.rows[0].id,
+      student_id: student_id || null,
       student_name: studentName,
       item_name: winner.name,
       class: studentClass,
@@ -227,6 +228,30 @@ app.get('/api/wins', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM wins ORDER BY timestamp DESC');
     res.json(result.rows);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put('/api/wins/pack-bulk', async (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'נדרשים מזהים' });
+  }
+  const numIds = ids.map(Number).filter(n => Number.isInteger(n) && n > 0);
+  if (numIds.length === 0) {
+    return res.status(400).json({ error: 'מזהים לא תקינים' });
+  }
+  try {
+    const result = await pool.query(
+      'UPDATE wins SET packed = 1 WHERE id = ANY($1::int[]) AND packed = 0 RETURNING id',
+      [numIds]
+    );
+    const packedIds = result.rows.map(r => r.id);
+    for (const id of packedIds) {
+      io.emit('item_packed', { win_id: id });
+    }
+    res.json({ ok: true, packed: packedIds });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

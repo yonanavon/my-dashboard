@@ -48,23 +48,44 @@
       letter-spacing: 1px;
       margin-bottom: 16px;
     }
-    .current-item-name {
-      font-size: 3rem;
-      font-weight: 900;
-      color: var(--green);
-      margin-bottom: 12px;
-      line-height: 1.1;
-    }
     .current-student {
-      font-size: 1.5rem;
-      font-weight: 700;
+      font-size: 2.6rem;
+      font-weight: 900;
       color: var(--text);
       margin-bottom: 6px;
+      line-height: 1.1;
     }
     .current-class {
-      font-size: 1rem;
+      font-size: 1.05rem;
       color: var(--text-muted);
-      margin-bottom: 28px;
+      margin-bottom: 20px;
+    }
+    .current-items {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 24px;
+      width: 100%;
+      max-width: 420px;
+    }
+    .current-item-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(46,204,113,0.12);
+      border: 1px solid rgba(46,204,113,0.35);
+      border-radius: 12px;
+      padding: 10px 18px;
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--green);
+    }
+    .current-item-row .bullet {
+      width: 8px;
+      height: 8px;
+      background: var(--green);
+      border-radius: 50%;
+      flex-shrink: 0;
     }
     .pack-hint {
       background: rgba(255,255,255,0.05);
@@ -113,8 +134,24 @@
       font-size: 0.9rem;
     }
     .queue-item:last-child { border-bottom: none; }
-    .queue-item .item-n { font-weight: 700; color: var(--text); }
+    .queue-item .item-n {
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
     .queue-item .item-s { color: var(--text-muted); font-size: 0.82rem; margin-top: 2px; }
+    .queue-item .qty-badge {
+      background: var(--accent);
+      color: #1a0a2e;
+      border-radius: 50px;
+      padding: 1px 8px;
+      font-size: 0.75rem;
+      font-weight: 800;
+      min-width: 22px;
+      text-align: center;
+    }
 
     .done-list { max-height: 240px; overflow-y: auto; }
     .done-item {
@@ -159,11 +196,11 @@
           <div style="font-size:3rem;margin-bottom:12px;">📦</div>
           ממתינים לזכיות...
         </div>
-        <div id="current-content" style="display:none;width:100%;">
-          <div class="current-item-name" id="cur-item-name"></div>
+        <div id="current-content" style="display:none;width:100%;align-items:center;flex-direction:column;">
           <div class="current-student" id="cur-student"></div>
           <div class="current-class" id="cur-class"></div>
-          <div class="pack-hint">לחץ <kbd>SPACE</kbd> לסיום</div>
+          <div class="current-items" id="cur-items"></div>
+          <div class="pack-hint">לחץ <kbd>SPACE</kbd> לסיום (<span id="cur-count">0</span> פריטים)</div>
           <button class="btn btn-success pack-btn" onclick="packCurrent()">✓ בוצע</button>
         </div>
       </div>
@@ -200,32 +237,81 @@
   <script src="/socket.io/socket.io.js"></script>
   <script>
     // ===== State =====
-    let queue = [];     // [{id, student_name, item_name, class}]
+    let pending = [];      // unpacked wins NOT in current group (flat list)
+    let current = null;    // { key, student_id, student_name, class, wins: [...] }
     let done = [];
-    let current = null;
+    let lastFlashKey = null;
+
+    // ===== Helpers =====
+    function groupKey(w) {
+      // Anonymous wins (no student_id) don't group together
+      return w.student_id ? 'sid:' + w.student_id : 'win:' + w.id;
+    }
+
+    function buildGroups(wins) {
+      const map = new Map();
+      for (const w of wins) {
+        const k = groupKey(w);
+        let g = map.get(k);
+        if (!g) {
+          g = {
+            key: k,
+            student_id: w.student_id || null,
+            student_name: w.student_name,
+            class: w.class,
+            wins: [],
+          };
+          map.set(k, g);
+        }
+        g.wins.push(w);
+      }
+      const groups = [...map.values()];
+      for (const g of groups) {
+        g.wins.sort((a, b) => a.id - b.id);
+        g.earliestId = g.wins[0].id;
+      }
+      // Sort: by item count DESC, then by earliest id ASC (FIFO within ties)
+      groups.sort((a, b) => {
+        if (b.wins.length !== a.wins.length) return b.wins.length - a.wins.length;
+        return a.earliestId - b.earliestId;
+      });
+      return groups;
+    }
 
     // ===== Socket =====
     const socket = io();
 
     socket.on('new_win', ({ win }) => {
-      queue.push(win);
+      if (current && groupKey(win) === current.key) {
+        current.wins.push(win);
+        current.wins.sort((a, b) => a.id - b.id);
+      } else {
+        pending.push(win);
+        if (!current) advanceQueue();
+      }
       renderAll();
-      if (!current) advanceQueue();
     });
 
     socket.on('item_packed', ({ win_id }) => {
-      // If this is our current item being packed from another tab
-      if (current && current.id === win_id) {
-        done.unshift(current);
-        current = null;
-        advanceQueue();
-      } else {
-        // Remove from queue if it was there
-        const idx = queue.findIndex(w => w.id === win_id);
+      if (current) {
+        const idx = current.wins.findIndex(w => w.id === win_id);
         if (idx !== -1) {
-          const removed = queue.splice(idx, 1)[0];
+          const removed = current.wins.splice(idx, 1)[0];
+          removed.packed = 1;
           done.unshift(removed);
+          if (current.wins.length === 0) {
+            current = null;
+            advanceQueue();
+          }
+          renderAll();
+          return;
         }
+      }
+      const idx = pending.findIndex(w => w.id === win_id);
+      if (idx !== -1) {
+        const removed = pending.splice(idx, 1)[0];
+        removed.packed = 1;
+        done.unshift(removed);
       }
       renderAll();
     });
@@ -234,40 +320,40 @@
     async function loadWins() {
       const r = await fetch('/api/wins');
       const wins = await r.json();
-      // Split into pending and done
-      const pending = wins.filter(w => !w.packed).reverse(); // oldest first
-      done = wins.filter(w => w.packed).reverse();
-      queue = pending;
-      if (queue.length) advanceQueue();
-      else renderAll();
+      pending = wins.filter(w => !w.packed).reverse(); // oldest first
+      done = wins.filter(w => w.packed); // newest first (API returns DESC)
+      current = null;
+      advanceQueue();
+      renderAll();
     }
 
     // ===== Queue management =====
     function advanceQueue() {
-      if (current) return; // already have one
-      if (queue.length === 0) {
+      if (current) return;
+      if (pending.length === 0) {
         current = null;
-        renderAll();
         return;
       }
-      current = queue.shift();
-      renderAll();
+      const groups = buildGroups(pending);
+      const top = groups[0];
+      const ids = new Set(top.wins.map(w => w.id));
+      pending = pending.filter(w => !ids.has(w.id));
+      current = top;
     }
 
     async function packCurrent() {
-      if (!current) return;
-      const id = current.id;
-      const r = await fetch('/api/wins/' + id + '/pack', { method: 'PUT' });
-      if (r.status === 409) {
-        // Already packed (another tab got it)
-        toast('כבר בוצע על ידי אחד אחר', 'error');
-        done.unshift(current);
-        current = null;
-        advanceQueue();
+      if (!current || current.wins.length === 0) return;
+      const ids = current.wins.map(w => w.id);
+      const r = await fetch('/api/wins/pack-bulk', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids })
+      });
+      if (!r.ok) {
+        toast('שגיאה בעת אריזה', 'error');
         return;
       }
-      if (!r.ok) return;
-      // Socket event will handle the UI update
+      // Socket events handle the UI update
     }
 
     // ===== Render =====
@@ -282,40 +368,58 @@
       const empty = document.getElementById('current-empty');
       const content = document.getElementById('current-content');
 
-      if (!current) {
+      if (!current || current.wins.length === 0) {
         card.classList.add('empty');
         empty.style.display = 'block';
         content.style.display = 'none';
+        lastFlashKey = null;
         return;
       }
 
       card.classList.remove('empty');
       empty.style.display = 'none';
-      content.style.display = 'block';
-      document.getElementById('cur-item-name').textContent = current.item_name;
+      content.style.display = 'flex';
       document.getElementById('cur-student').textContent = '👤 ' + current.student_name;
       document.getElementById('cur-class').textContent = current.class ? 'כיתה ' + current.class : '';
+      document.getElementById('cur-count').textContent = current.wins.length;
+      document.getElementById('cur-items').innerHTML = current.wins.map(w => `
+        <div class="current-item-row">
+          <span class="bullet"></span>
+          <span>${esc(w.item_name)}</span>
+        </div>
+      `).join('');
 
-      // Flash animation
-      card.classList.remove('flash');
-      void card.offsetWidth;
-      card.classList.add('flash');
+      // Flash when current group changes or items added
+      const flashKey = current.key + ':' + current.wins.length;
+      if (flashKey !== lastFlashKey) {
+        card.classList.remove('flash');
+        void card.offsetWidth;
+        card.classList.add('flash');
+        lastFlashKey = flashKey;
+      }
     }
 
     function renderQueue() {
       const list = document.getElementById('queue-list');
-      document.getElementById('queue-count').textContent = queue.length;
+      const groups = buildGroups(pending);
+      const totalItems = pending.length;
+      document.getElementById('queue-count').textContent = totalItems;
 
-      if (!queue.length) {
+      if (!groups.length) {
         list.innerHTML = '<div class="empty-queue">התור ריק</div>';
         return;
       }
-      list.innerHTML = queue.map((w, i) => `
-        <div class="queue-item">
-          <div class="item-n">${esc(w.item_name)}</div>
-          <div class="item-s">${esc(w.student_name)}${w.class ? ' · כיתה ' + esc(w.class) : ''}</div>
-        </div>
-      `).join('');
+      list.innerHTML = groups.map(g => {
+        const itemsText = g.wins.map(w => esc(w.item_name)).join(', ');
+        const classText = g.class ? ' · כיתה ' + esc(g.class) : '';
+        const badge = g.wins.length > 1 ? `<span class="qty-badge">${g.wins.length}</span>` : '';
+        return `
+          <div class="queue-item">
+            <div class="item-n">${badge}<span>${esc(g.student_name)}</span></div>
+            <div class="item-s">${itemsText}${classText}</div>
+          </div>
+        `;
+      }).join('');
     }
 
     function renderDone() {
